@@ -1,28 +1,21 @@
 import 'server-only';
 import Stripe from 'stripe';
+import { envValue } from '@/lib/env';
+import { isModuleReady } from '@/lib/modules';
 
 let stripe: Stripe | null = null;
 
-function isPlaceholder(value: string | undefined): boolean {
-  return !value || value.includes('REPLACE_ME');
-}
-
-/** Server-side Stripe singleton. Returns null until real keys are configured. */
+/** Server-side Stripe singleton. Null unless the stripe module is ready (see src/config/modules.ts). */
 export function getStripe(): Stripe | null {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (isPlaceholder(secretKey)) return null;
-  if (!stripe) stripe = new Stripe(secretKey!);
+  if (!isModuleReady('stripe')) return null;
+  if (!stripe) stripe = new Stripe(envValue('STRIPE_SECRET_KEY')!);
   return stripe;
 }
 
-export function isStripeConfigured(): boolean {
-  return (
-    !isPlaceholder(process.env.STRIPE_SECRET_KEY) &&
-    !isPlaceholder(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
-  );
+export function stripePublishableKey(): string | null {
+  return isModuleReady('stripe') ? envValue('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY')! : null;
 }
 
 export function stripeWebhookSecret(): string | null {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  return isPlaceholder(secret) ? null : secret!;
+  return envValue('STRIPE_WEBHOOK_SECRET') ?? null;
 }

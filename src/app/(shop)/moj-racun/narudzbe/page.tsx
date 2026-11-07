@@ -1,30 +1,39 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { desc, eq } from 'drizzle-orm';
 import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/orders/order-details';
-import { requireUser } from '@/lib/auth';
+import { getDb } from '@/db';
+import { orders } from '@/db/schema';
+import { requireUser } from '@/lib/auth/server';
 import { formatDate, formatPrice } from '@/lib/utils';
 
 export const metadata: Metadata = { title: 'Moje narudžbe', robots: { index: false } };
 
 export default async function MyOrdersPage() {
-  const { user, supabase } = await requireUser('/moj-racun/narudzbe');
+  const user = await requireUser('/moj-racun/narudzbe');
   // Orders placed as a guest with the same e-mail are not linked automatically.
-  const { data: orders } = await supabase
-    .from('orders')
-    .select('id, order_number, created_at, status, total_cents')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+  const rows = await getDb()
+    .select({
+      id: orders.id,
+      order_number: orders.order_number,
+      created_at: orders.created_at,
+      status: orders.status,
+      total_cents: orders.total_cents,
+    })
+    .from(orders)
+    .where(eq(orders.user_id, user.id))
+    .orderBy(desc(orders.created_at));
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Narudžbe</h1>
-      {!orders?.length ? (
+      {rows.length === 0 ? (
         <Card className="text-center text-muted-foreground">Još nemate narudžbi.</Card>
       ) : (
         <Card className="p-0">
           <ul className="divide-y">
-            {orders.map((o) => (
+            {rows.map((o) => (
               <li key={o.id}>
                 <Link
                   href={`/moj-racun/narudzbe/${o.id}`}

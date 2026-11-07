@@ -1,19 +1,78 @@
 'use client';
 
-import { useActionState, useTransition } from 'react';
-import { Star, Trash2 } from 'lucide-react';
+import { useRef, useState, useTransition } from 'react';
+import { Loader2, Star, Trash2 } from 'lucide-react';
+import { upload } from '@vercel/blob/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormMessage, Input } from '@/components/ui/form';
 import { ProductImage } from '@/components/ui/product-image';
-import { SubmitButton } from '@/components/ui/submit-button';
-import { deleteProductImage, makeMainProductImage, uploadProductImages } from '@/app/admin/actions';
+import { addProductImages, deleteProductImage, makeMainProductImage } from '@/app/admin/actions';
 
 type Image = { id: string; url: string; alt: string | null };
 
-export function ProductImagesManager({ productId, images }: { productId: string; images: Image[] }) {
-  const [state, action] = useActionState(uploadProductImages, null);
+const ACCEPT = 'image/jpeg,image/png,image/webp,image/avif,image/gif';
+const MAX_BYTES = 10 * 1024 * 1024;
+
+function safeFileName(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9.]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'slika'
+  );
+}
+
+/** Product images: uploaded straight from the browser to Vercel Blob (/api/admin/upload issues the token). */
+export function ProductImagesManager({
+  productId,
+  images,
+  uploadsEnabled,
+}: {
+  productId: string;
+  images: Image[];
+  uploadsEnabled: boolean;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  async function uploadFiles() {
+    const files = Array.from(fileRef.current?.files ?? []);
+    if (files.length === 0) {
+      setMessage({ type: 'error', text: 'Odaberite barem jednu sliku.' });
+      return;
+    }
+    const tooBig = files.find((f) => f.size > MAX_BYTES);
+    if (tooBig) {
+      setMessage({ type: 'error', text: `${tooBig.name}: najveća veličina je 10 MB.` });
+      return;
+    }
+
+    setUploading(true);
+    setMessage(null);
+    try {
+      const uploaded = [];
+      for (const file of files) {
+        const blob = await upload(`products/${productId}/${safeFileName(file.name)}`, file, {
+          access: 'public',
+          handleUploadUrl: '/api/admin/upload',
+          contentType: file.type,
+        });
+        uploaded.push({ url: blob.url });
+      }
+      const result = await addProductImages(productId, uploaded);
+      setMessage(result?.error ? { type: 'error', text: result.error } : { type: 'success', text: result?.success ?? 'Spremljeno.' });
+      if (fileRef.current) fileRef.current.value = '';
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Učitavanje nije uspjelo.' });
+    } finally {
+      setUploading(false);
+    }
+  }
 
   return (
     <Card className="space-y-4">
@@ -58,23 +117,31 @@ export function ProductImagesManager({ productId, images }: { productId: string;
       ) : (
         <p className="text-sm text-muted-foreground">Proizvod još nema slika.</p>
       )}
-      <form action={action} className="flex flex-wrap items-center gap-3">
-        <input type="hidden" name="product_id" value={productId} />
-        <Input
-          type="file"
-          name="files"
-          accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
-          multiple
-          className="h-auto max-w-sm py-2"
-          aria-label="Odaberi slike"
-        />
-        <SubmitButton variant="outline" pendingText="Učitavanje…">
-          Učitaj slike
-        </SubmitButton>
-      </form>
-      <p className="text-xs text-muted-foreground">JPG, PNG, WebP, AVIF ili GIF, najviše 5 MB po slici.</p>
-      {state?.error && <FormMessage type="error">{state.error}</FormMessage>}
-      {state?.success && <FormMessage type="success">{state.success}</FormMessage>}
+
+      {uploadsEnabled ? (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              ref={fileRef}
+              type="file"
+              accept={ACCEPT}
+              multiple
+              className="h-auto max-w-sm py-2"
+              aria-label="Odaberi slike"
+            />
+            <Button type="button" variant="outline" disabled={uploading} onClick={uploadFiles}>
+              {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {uploading ? 'Učitavanje…' : 'Učitaj slike'}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">JPG, PNG, WebP, AVIF ili GIF, najviše 10 MB po slici.</p>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Učitavanje slika je isključeno: postavite BLOB_READ_WRITE_TOKEN (Vercel Blob) — vidi INTEGRATIONS.md.
+        </p>
+      )}
+      {message && <FormMessage type={message.type}>{message.text}</FormMessage>}
     </Card>
   );
 }

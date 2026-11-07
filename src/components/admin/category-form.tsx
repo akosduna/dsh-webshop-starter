@@ -58,7 +58,7 @@ export function CategoryForm({
         <Field
           label="Slika (URL)"
           htmlFor="image_url"
-          hint="Npr. javni URL slike iz Supabase Storagea ili /demo/… datoteka."
+          hint="URL slike učitane u Vercel Blob ili /demo/… datoteka iz mape public."
           className="sm:col-span-2"
         >
           <Input id="image_url" name="image_url" defaultValue={category?.image_url ?? ''} />

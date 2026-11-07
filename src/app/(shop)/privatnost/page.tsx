@@ -36,10 +36,11 @@ export default function PrivacyPage() {
       <h2>4. Primatelji podataka</h2>
       <p>Podatke dijelimo samo s pružateljima usluga nužnih za rad trgovine:</p>
       <ul>
-        <li>Supabase — baza podataka i prijava korisnika (<Fill>regija poslužitelja, npr. EU</Fill>);</li>
-        <li>Vercel — poslužitelj internetske stranice;</li>
-        <li>Stripe — obrada plaćanja karticama;</li>
-        <li><Fill>dostavna služba</Fill> — dostava pošiljaka;</li>
+        <li>Neon — baza podataka (<Fill>regija poslužitelja, npr. EU (Frankfurt)</Fill>);</li>
+        <li>Vercel — poslužitelj internetske stranice i pohrana slika;</li>
+        <li><Fill>Stripe i/ili Teya</Fill> — obrada plaćanja karticama;</li>
+        <li><Fill>GLS i/ili BOX NOW</Fill> — dostava pošiljaka;</li>
+        <li><Fill>Resend</Fill> — slanje e-mail obavijesti o narudžbi;</li>
         <li><Fill>knjigovodstveni servis i ostali primatelji</Fill>.</li>
       </ul>
       <p>

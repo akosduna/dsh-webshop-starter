@@ -1,18 +1,28 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useCallback, useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Elements } from '@stripe/react-stripe-js';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox, Field, FormMessage, Input, Select, Textarea } from '@/components/ui/form';
 import { AddressFields } from '@/components/checkout/address-fields';
+import { BoxNowLockerPicker } from '@/components/checkout/boxnow-locker-picker';
+import { GlsParcelPicker } from '@/components/checkout/gls-parcel-picker';
 import { PaymentStep } from '@/components/checkout/payment-step';
+import { TeyaRedirectForm } from '@/components/checkout/teya-redirect-form';
 import { createOrder } from '@/app/(shop)/naplata/actions';
+import type { PaymentMethod, PickupPoint } from '@/db/enums';
 import { getStripePromise } from '@/lib/stripe/client';
-import { shippingCostCents, type ShippingMethod } from '@/lib/shop/shipping';
-import { emptyAddress, type AddressInput, type CheckoutResult } from '@/lib/shop/checkout-types';
+import { needsAddress, needsPickupPoint, quoteShipping, type ShippingMethod } from '@/lib/shop/shipping';
+import {
+  emptyAddress,
+  type AddressInput,
+  type CheckoutResult,
+  type PaymentOption,
+} from '@/lib/shop/checkout-types';
 import { cn, formatPrice } from '@/lib/utils';
 import { cartSubtotalCents, useCart, useHydrated } from '@/store/cart';
 
@@ -47,17 +57,22 @@ function toAddressInput(a: SavedAddress): AddressInput {
   };
 }
 
-type PaidStep = Extract<CheckoutResult, { ok: true }>;
+type CreatedOrder = Extract<CheckoutResult, { ok: true }>;
 
 export function CheckoutForm({
   shippingMethods,
+  paymentOptions,
   customer,
-  stripeReady,
+  stripePublishableKey,
+  boxNowPartnerId,
 }: {
   shippingMethods: ShippingMethod[];
+  paymentOptions: PaymentOption[];
   customer: Customer | null;
-  stripeReady: boolean;
+  stripePublishableKey: string | null;
+  boxNowPartnerId: string | null;
 }) {
+  const router = useRouter();
   const hydrated = useHydrated();
   const items = useCart((s) => s.items);
 
@@ -65,25 +80,37 @@ export function CheckoutForm({
   const [email, setEmail] = useState(customer?.email ?? '');
   const [phone, setPhone] = useState(customer?.phone ?? '');
   const [shippingMethodId, setShippingMethodId] = useState(shippingMethods[0]?.id ?? '');
+  const [pickupPoints, setPickupPoints] = useState<Record<string, PickupPoint | null>>({});
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>(paymentOptions[0]?.id ?? '');
   const [shippingAddress, setShippingAddress] = useState<AddressInput>(
     defaultAddress
       ? toAddressInput(defaultAddress)
       : { ...emptyAddress, full_name: customer?.fullName ?? '', phone: customer?.phone ?? '' },
   );
   const [billingSame, setBillingSame] = useState(true);
-  const [billingAddress, setBillingAddress] = useState<AddressInput>(emptyAddress);
+  const [billingAddress, setBillingAddress] = useState<AddressInput>({
+    ...emptyAddress,
+    full_name: customer?.fullName ?? '',
+  });
   const [note, setNote] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [saveAddress, setSaveAddress] = useState(!!customer && !defaultAddress);
 
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [payment, setPayment] = useState<PaidStep | null>(null);
+  const [created, setCreated] = useState<CreatedOrder | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const method = shippingMethods.find((m) => m.id === shippingMethodId);
+  const pickupPoint = method ? (pickupPoints[method.id] ?? null) : null;
+  const setPickupPoint = useCallback(
+    (point: PickupPoint) => setPickupPoints((prev) => ({ ...prev, [shippingMethodId]: point })),
+    [shippingMethodId],
+  );
 
   if (!hydrated) return <div className="h-96 animate-pulse rounded-lg bg-muted" aria-busy />;
 
-  if (items.length === 0 && !payment) {
+  if (items.length === 0 && !created) {
     return (
       <Card className="py-12 text-center">
         <p className="text-muted-foreground">Košarica je prazna.</p>
@@ -94,10 +121,12 @@ export function CheckoutForm({
     );
   }
 
-  const method = shippingMethods.find((m) => m.id === shippingMethodId);
-  const isPickup = method?.type === 'pickup';
+  const withAddress = method ? needsAddress(method.type) : true;
+  const withPickupPoint = method ? needsPickupPoint(method.type) : false;
   const subtotal = cartSubtotalCents(items);
-  const shipping = method ? shippingCostCents(method, subtotal) : 0;
+  const country = withAddress ? shippingAddress.country : undefined;
+  const quote = method ? quoteShipping(method, subtotal, country) : null;
+  const shipping = quote?.available ? quote.priceCents : 0;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -109,19 +138,25 @@ export function CheckoutForm({
         phone,
         items: items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
         shippingMethodId,
+        pickupPoint: withPickupPoint ? pickupPoint : null,
+        paymentMethod: paymentMethod as PaymentMethod,
         shippingAddress,
-        billingSameAsShipping: billingSame && !isPickup,
+        billingSameAsShipping: billingSame && withAddress,
         billingAddress,
         note,
         acceptTerms,
         saveAddress,
       });
-      if (result.ok) {
-        setPayment(result);
-      } else {
+      if (!result.ok) {
         setError(result.error);
         setFieldErrors(result.fieldErrors ?? {});
+        return;
       }
+      if (result.paymentMethod === 'bank_transfer') {
+        router.push(`/naplata/uspjeh?order=${result.orderId}&t=${encodeURIComponent(result.accessToken)}`);
+        return;
+      }
+      setCreated(result);
     });
   }
 
@@ -142,11 +177,11 @@ export function CheckoutForm({
       <div className="space-y-1 border-t pt-3 text-sm">
         <div className="flex justify-between">
           <span>Međuzbroj</span>
-          <span>{formatPrice(payment?.subtotalCents ?? subtotal)}</span>
+          <span>{formatPrice(created?.subtotalCents ?? subtotal)}</span>
         </div>
         <div className="flex justify-between">
           <span>Dostava{method ? ` (${method.name})` : ''}</span>
-          <span>{formatPrice(payment?.shippingCents ?? shipping)}</span>
+          <span>{formatPrice(created?.shippingCents ?? shipping)}</span>
         </div>
         {method?.free_over_cents != null && subtotal < method.free_over_cents && (
           <p className="text-xs text-muted-foreground">
@@ -156,26 +191,34 @@ export function CheckoutForm({
       </div>
       <div className="flex justify-between border-t pt-3 font-semibold">
         <span>Ukupno</span>
-        <span>{formatPrice(payment?.totalCents ?? subtotal + shipping)}</span>
+        <span>{formatPrice(created?.totalCents ?? subtotal + shipping)}</span>
       </div>
     </Card>
   );
 
-  if (payment) {
+  if (created?.teya) {
+    return (
+      <Card>
+        <TeyaRedirectForm actionUrl={created.teya.actionUrl} fields={created.teya.fields} />
+      </Card>
+    );
+  }
+
+  if (created?.clientSecret && stripePublishableKey) {
     return (
       <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
         <Card className="space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Plaćanje — narudžba #{payment.orderNumber}</h2>
-            <Button variant="link" size="sm" onClick={() => setPayment(null)}>
+            <h2 className="text-lg font-semibold">Plaćanje — narudžba #{created.orderNumber}</h2>
+            <Button variant="link" size="sm" onClick={() => setCreated(null)}>
               Uredi podatke
             </Button>
           </div>
           <Elements
-            stripe={getStripePromise()}
-            options={{ clientSecret: payment.clientSecret, locale: 'hr', appearance: { theme: 'stripe' } }}
+            stripe={getStripePromise(stripePublishableKey)}
+            options={{ clientSecret: created.clientSecret, locale: 'hr', appearance: { theme: 'stripe' } }}
           >
-            <PaymentStep orderId={payment.orderId} totalCents={payment.totalCents} />
+            <PaymentStep orderId={created.orderId} accessToken={created.accessToken} totalCents={created.totalCents} />
           </Elements>
         </Card>
         {summary}
@@ -183,12 +226,15 @@ export function CheckoutForm({
     );
   }
 
+  const noPayment = paymentOptions.length === 0;
+  const noShipping = shippingMethods.length === 0;
+
   return (
     <form onSubmit={submit} className="grid gap-8 lg:grid-cols-[1fr_360px]" noValidate>
       <div className="space-y-6">
-        {!stripeReady && (
+        {noPayment && (
           <FormMessage type="error">
-            Stripe ključevi nisu postavljeni — naplata neće raditi dok ih ne dodate (vidi AGENT-SETUP.md).
+            Trgovina još nema postavljen nijedan način plaćanja. Pokušajte ponovno kasnije.
           </FormMessage>
         )}
 
@@ -198,7 +244,7 @@ export function CheckoutForm({
             {!customer && (
               <p className="text-sm text-muted-foreground">
                 Imate račun?{' '}
-                <Link href="/prijava?next=/naplata" className="text-primary hover:underline">
+                <Link href="/prijava?redirect=/naplata" className="text-primary hover:underline">
                   Prijavite se
                 </Link>
               </p>
@@ -218,17 +264,16 @@ export function CheckoutForm({
 
         <Card className="space-y-3">
           <h2 className="font-semibold">Način dostave</h2>
-          {shippingMethods.length === 0 && (
-            <FormMessage type="error">Trgovina još nema aktivnih načina dostave.</FormMessage>
-          )}
+          {noShipping && <FormMessage type="error">Trgovina još nema aktivnih načina dostave.</FormMessage>}
           {shippingMethods.map((m) => {
-            const cost = shippingCostCents(m, subtotal);
+            const q = quoteShipping(m, subtotal, needsAddress(m.type) ? shippingAddress.country : undefined);
             return (
               <label
                 key={m.id}
                 className={cn(
                   'flex cursor-pointer items-start gap-3 rounded-md border p-3',
                   m.id === shippingMethodId && 'border-primary ring-1 ring-primary',
+                  !q.available && 'opacity-60',
                 )}
               >
                 <input
@@ -242,19 +287,28 @@ export function CheckoutForm({
                 <span className="flex-1">
                   <span className="flex justify-between gap-3 font-medium">
                     {m.name}
-                    <span>{cost === 0 ? 'Besplatno' : formatPrice(cost)}</span>
+                    <span>{!q.available ? '—' : q.priceCents === 0 ? 'Besplatno' : formatPrice(q.priceCents)}</span>
                   </span>
                   {m.description && <span className="block text-sm text-muted-foreground">{m.description}</span>}
+                  {!q.available && <span className="block text-sm text-destructive">{q.reason}</span>}
                 </span>
               </label>
             );
           })}
-          {fieldErrors.shippingMethodId && (
-            <p className="text-xs text-destructive">{fieldErrors.shippingMethodId}</p>
+          {fieldErrors.shippingMethodId && <p className="text-xs text-destructive">{fieldErrors.shippingMethodId}</p>}
+
+          {method && withPickupPoint && (
+            <div className="pt-2">
+              {method.type === 'gls_parcel' && <GlsParcelPicker value={pickupPoint} onChange={setPickupPoint} />}
+              {method.type === 'boxnow' && boxNowPartnerId && (
+                <BoxNowLockerPicker partnerId={boxNowPartnerId} value={pickupPoint} onChange={setPickupPoint} />
+              )}
+              {fieldErrors.pickupPoint && <p className="mt-2 text-xs text-destructive">{fieldErrors.pickupPoint}</p>}
+            </div>
           )}
         </Card>
 
-        {!isPickup && (
+        {withAddress && (
           <Card className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold">Adresa dostave</h2>
@@ -288,16 +342,45 @@ export function CheckoutForm({
 
         <Card className="space-y-4">
           <h2 className="font-semibold">Podaci za račun</h2>
-          {!isPickup && (
+          {withAddress && (
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={billingSame} onChange={(e) => setBillingSame(e.target.checked)} />
               Isti kao adresa dostave
             </label>
           )}
-          {(isPickup || !billingSame) && (
+          {(!withAddress || !billingSame) && (
             <AddressFields prefix="billing" value={billingAddress} onChange={setBillingAddress} errors={fieldErrors} />
           )}
         </Card>
+
+        {paymentOptions.length > 0 && (
+          <Card className="space-y-3">
+            <h2 className="font-semibold">Način plaćanja</h2>
+            {paymentOptions.map((option) => (
+              <label
+                key={option.id}
+                className={cn(
+                  'flex cursor-pointer items-start gap-3 rounded-md border p-3',
+                  option.id === paymentMethod && 'border-primary ring-1 ring-primary',
+                )}
+              >
+                <input
+                  type="radio"
+                  name="payment"
+                  value={option.id}
+                  checked={option.id === paymentMethod}
+                  onChange={() => setPaymentMethod(option.id)}
+                  className="mt-1 accent-primary"
+                />
+                <span className="flex-1">
+                  <span className="block font-medium">{option.label}</span>
+                  <span className="block text-sm text-muted-foreground">{option.description}</span>
+                </span>
+              </label>
+            ))}
+            {fieldErrors.paymentMethod && <p className="text-xs text-destructive">{fieldErrors.paymentMethod}</p>}
+          </Card>
+        )}
 
         <Card className="space-y-4">
           <Field label="Napomena uz narudžbu (nije obavezno)" htmlFor="note">
@@ -325,13 +408,15 @@ export function CheckoutForm({
 
       <div className="space-y-4">
         {summary}
-        <Button type="submit" size="lg" className="w-full" disabled={pending || shippingMethods.length === 0}>
+        <Button type="submit" size="lg" className="w-full" disabled={pending || noShipping || noPayment}>
           {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-          Nastavi na plaćanje
+          {paymentMethod === 'bank_transfer' ? 'Naruči' : 'Nastavi na plaćanje'}
         </Button>
-        <p className="text-center text-xs text-muted-foreground">
-          Sigurno plaćanje karticom putem Stripea.
-        </p>
+        {paymentMethod === 'bank_transfer' && (
+          <p className="text-center text-xs text-muted-foreground">
+            Nakon narudžbe dobit ćete podatke za uplatu i barkod.
+          </p>
+        )}
       </div>
     </form>
   );

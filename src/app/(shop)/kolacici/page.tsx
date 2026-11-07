@@ -16,8 +16,12 @@ export default function CookiesPage() {
       <p>Trgovina u osnovnoj verziji koristi samo nužne kolačiće, za koje nije potrebna privola:</p>
       <ul>
         <li>
-          <strong>sb-…</strong> (Supabase) — održava prijavu u korisnički račun. Traje dok se ne
+          <strong>better-auth.session_token</strong> — održava prijavu u korisnički račun. Traje dok se ne
           odjavite ili sesija ne istekne.
+        </li>
+        <li>
+          <strong>shop_order_…</strong> — omogućuje pregled vaše narudžbe i podataka za plaćanje bez
+          prijave. Traje 60 dana.
         </li>
         <li>
           <strong>shop-cart</strong> (lokalna pohrana) — pamti sadržaj košarice na vašem uređaju.

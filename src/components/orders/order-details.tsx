@@ -5,44 +5,21 @@ import {
   PAYMENT_STATUS_LABELS,
   orderStatusLabel,
   parseAddressSnapshot,
+  paymentMethodLabel,
+  pickupPointLine,
   type AddressSnapshot,
 } from '@/lib/shop/orders';
+import type { OrderWithItems } from '@/lib/shop/order-viewer';
+import { trackingUrlFor } from '@/lib/shipping/tracking-urls';
 import { formatDate, formatPrice } from '@/lib/utils';
-import type { Json } from '@/types/database';
-
-export type OrderForDisplay = {
-  order_number: number;
-  created_at: string;
-  status: string;
-  payment_status: string;
-  email: string;
-  phone: string | null;
-  shipping_method_name: string;
-  subtotal_cents: number;
-  shipping_cents: number;
-  total_cents: number;
-  shipping_address: Json | null;
-  billing_address: Json;
-  customer_note: string | null;
-  order_items: {
-    id: string;
-    product_name: string;
-    variant_name: string | null;
-    sku: string | null;
-    image_url: string | null;
-    unit_price_cents: number;
-    quantity: number;
-    line_total_cents: number;
-  }[];
-};
 
 export function StatusBadge({ status }: { status: string }) {
   const tone =
     status === 'cancelled'
       ? 'danger'
-      : status === 'pending_payment'
+      : status === 'awaiting_payment'
         ? 'warning'
-        : status === 'completed' || status === 'shipped'
+        : status === 'completed' || status === 'shipped' || status === 'delivered'
           ? 'success'
           : 'primary';
   return <Badge tone={tone}>{orderStatusLabel(status)}</Badge>;
@@ -79,7 +56,10 @@ function AddressBlock({ title, address }: { title: string; address: AddressSnaps
   );
 }
 
-export function OrderDetails({ order }: { order: OrderForDisplay }) {
+export function OrderDetails({ order }: { order: OrderWithItems }) {
+  const pickup = pickupPointLine(order.pickup_point);
+  const tracked = order.shipments.filter((s) => s.tracking_number && s.status !== 'cancelled');
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -88,6 +68,7 @@ export function OrderDetails({ order }: { order: OrderForDisplay }) {
         <Badge tone={order.payment_status === 'paid' ? 'success' : 'neutral'}>
           {PAYMENT_STATUS_LABELS[order.payment_status] ?? order.payment_status}
         </Badge>
+        <span>{paymentMethodLabel(order.payment_method)}</span>
       </div>
 
       <Card className="p-0">
@@ -99,9 +80,7 @@ export function OrderDetails({ order }: { order: OrderForDisplay }) {
               </div>
               <div className="flex-1 text-sm">
                 <p className="font-medium">{item.product_name}</p>
-                <p className="text-muted-foreground">
-                  {[item.variant_name, item.sku].filter(Boolean).join(' · ')}
-                </p>
+                <p className="text-muted-foreground">{[item.variant_name, item.sku].filter(Boolean).join(' · ')}</p>
               </div>
               <p className="text-sm text-muted-foreground">
                 {item.quantity} × {formatPrice(item.unit_price_cents)}
@@ -139,8 +118,34 @@ export function OrderDetails({ order }: { order: OrderForDisplay }) {
             )}
           </p>
         </div>
-        <AddressBlock title="Adresa dostave" address={parseAddressSnapshot(order.shipping_address)} />
+        {pickup ? (
+          <div>
+            <p className="mb-1 text-sm font-semibold">Preuzimanje</p>
+            <p className="text-sm text-muted-foreground">{pickup}</p>
+          </div>
+        ) : (
+          <AddressBlock title="Adresa dostave" address={parseAddressSnapshot(order.shipping_address)} />
+        )}
         <AddressBlock title="Podaci za račun" address={parseAddressSnapshot(order.billing_address)} />
+        {tracked.length > 0 && (
+          <div className="sm:col-span-3">
+            <p className="mb-1 text-sm font-semibold">Praćenje pošiljke</p>
+            <ul className="text-sm">
+              {tracked.map((s) => (
+                <li key={s.id}>
+                  <a
+                    href={trackingUrlFor(s.provider, s.tracking_number!)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {s.provider === 'gls' ? 'GLS' : 'BOX NOW'} {s.tracking_number}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {order.customer_note && (
           <div className="sm:col-span-3">
             <p className="mb-1 text-sm font-semibold">Napomena kupca</p>
@@ -151,6 +156,3 @@ export function OrderDetails({ order }: { order: OrderForDisplay }) {
     </div>
   );
 }
-
-export const ORDER_DETAIL_SELECT =
-  'id, order_number, created_at, status, payment_status, email, phone, shipping_method_name, subtotal_cents, shipping_cents, total_cents, shipping_address, billing_address, customer_note, stripe_payment_intent_id, order_items(id, product_name, variant_name, sku, image_url, unit_price_cents, quantity, line_total_cents)' as const;

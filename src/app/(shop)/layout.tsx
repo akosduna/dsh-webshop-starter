@@ -1,5 +1,6 @@
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
+import { isModuleReady } from '@/lib/modules';
 import { getCategoryTree, getShopName, getStoreSettings } from '@/lib/shop/catalog';
 
 // Public pages are cached and refreshed at most every 60 s (admin changes
@@ -15,7 +16,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
 
   return (
     <>
-      <Header shopName={shopName} categories={categories} />
+      <Header shopName={shopName} categories={categories} showBlog={isModuleReady('blog')} />
       <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
       <Footer shopName={shopName} settings={settings} />
     </>

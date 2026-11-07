@@ -3,8 +3,8 @@ import { ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function shouldSkipOptimization(src: string): boolean {
-  // SVG placeholders and a local Supabase (127.0.0.1) can't go through the
-  // Next.js image optimizer; everything else (Supabase Storage) is optimized.
+  // SVG placeholders and local URLs can't go through the Next.js image
+  // optimizer; everything else (Vercel Blob) is optimized.
   return (
     src.endsWith('.svg') || src.startsWith('http://127.0.0.1') || src.startsWith('http://localhost')
   );

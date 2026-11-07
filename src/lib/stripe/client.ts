@@ -1,11 +1,17 @@
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 
-let stripePromise: Promise<Stripe | null> | null = null;
+const stripePromises = new Map<string, Promise<Stripe | null>>();
 
-/** Browser Stripe.js singleton (loads https://js.stripe.com once). */
-export function getStripePromise(): Promise<Stripe | null> {
-  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-  if (!key || key.includes('REPLACE_ME')) return Promise.resolve(null);
-  if (!stripePromise) stripePromise = loadStripe(key);
-  return stripePromise;
+/**
+ * Browser Stripe.js (loads https://js.stripe.com once per key). The
+ * publishable key comes from the server as a prop, so the Stripe module can be
+ * switched on with env alone.
+ */
+export function getStripePromise(publishableKey: string): Promise<Stripe | null> {
+  let promise = stripePromises.get(publishableKey);
+  if (!promise) {
+    promise = loadStripe(publishableKey);
+    stripePromises.set(publishableKey, promise);
+  }
+  return promise;
 }

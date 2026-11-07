@@ -1,14 +1,17 @@
 import Link from 'next/link';
+import { asc, isNull } from 'drizzle-orm';
 import { CategoryForm } from '@/components/admin/category-form';
-import { requireAdmin } from '@/lib/auth';
+import { getDb } from '@/db';
+import { categories } from '@/db/schema';
+import { requireAdmin } from '@/lib/auth/server';
 
 export default async function NewCategoryPage() {
-  const { supabase } = await requireAdmin();
-  const { data: parents } = await supabase
-    .from('categories')
-    .select('id, name')
-    .is('parent_id', null)
-    .order('sort_order');
+  await requireAdmin();
+  const parents = await getDb()
+    .select({ id: categories.id, name: categories.name })
+    .from(categories)
+    .where(isNull(categories.parent_id))
+    .orderBy(asc(categories.sort_order));
 
   return (
     <div className="space-y-6">
@@ -16,7 +19,7 @@ export default async function NewCategoryPage() {
         ← Kategorije
       </Link>
       <h1 className="text-2xl font-semibold">Nova kategorija</h1>
-      <CategoryForm parents={parents ?? []} />
+      <CategoryForm parents={parents} />
     </div>
   );
 }

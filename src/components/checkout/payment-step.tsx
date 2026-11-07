@@ -7,7 +7,15 @@ import { Button } from '@/components/ui/button';
 import { FormMessage } from '@/components/ui/form';
 import { formatPrice } from '@/lib/utils';
 
-export function PaymentStep({ orderId, totalCents }: { orderId: string; totalCents: number }) {
+export function PaymentStep({
+  orderId,
+  accessToken,
+  totalCents,
+}: {
+  orderId: string;
+  accessToken: string;
+  totalCents: number;
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +31,7 @@ export function PaymentStep({ orderId, totalCents }: { orderId: string; totalCen
     const { error: stripeError } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/naplata/uspjeh?order=${orderId}`,
+        return_url: `${window.location.origin}/naplata/uspjeh?order=${orderId}&t=${encodeURIComponent(accessToken)}`,
       },
     });
 

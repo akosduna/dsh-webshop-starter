@@ -1,4 +1,5 @@
 // Shared between the checkout form (client) and the createOrder action (server).
+import type { PaymentMethod, PickupPoint } from '@/db/enums';
 
 export type AddressInput = {
   full_name: string;
@@ -15,6 +16,8 @@ export type CheckoutInput = {
   phone: string;
   items: { productId: string; variantId: string | null; quantity: number }[];
   shippingMethodId: string;
+  pickupPoint: PickupPoint | null;
+  paymentMethod: PaymentMethod;
   shippingAddress: AddressInput;
   billingSameAsShipping: boolean;
   billingAddress: AddressInput;
@@ -23,17 +26,27 @@ export type CheckoutInput = {
   saveAddress: boolean;
 };
 
+export type TeyaRedirect = { actionUrl: string; fields: Record<string, string> };
+
 export type CheckoutResult =
   | {
       ok: true;
       orderId: string;
       orderNumber: number;
-      clientSecret: string;
+      accessToken: string;
+      paymentMethod: PaymentMethod;
       subtotalCents: number;
       shippingCents: number;
       totalCents: number;
+      /** Stripe only. */
+      clientSecret?: string;
+      /** Teya only. */
+      teya?: TeyaRedirect;
     }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
+
+/** Payment options offered at checkout (only modules that are ready). */
+export type PaymentOption = { id: PaymentMethod; label: string; description: string };
 
 export const COUNTRIES: { code: string; name: string }[] = [
   { code: 'HR', name: 'Hrvatska' },

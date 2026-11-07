@@ -1,21 +1,24 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { LayoutDashboard, Package, FolderTree, ShoppingCart, Settings, Store } from 'lucide-react';
-import { requireAdmin } from '@/lib/auth';
+import { FileText, FolderTree, LayoutDashboard, Package, Settings, ShoppingCart, Store } from 'lucide-react';
+import { requireAdmin } from '@/lib/auth/server';
+import { isModuleReady } from '@/lib/modules';
 
 export const metadata: Metadata = { title: 'Administracija', robots: { index: false } };
 export const dynamic = 'force-dynamic';
 
-const nav = [
-  { href: '/admin', label: 'Pregled', icon: LayoutDashboard },
-  { href: '/admin/orders', label: 'Narudžbe', icon: ShoppingCart },
-  { href: '/admin/products', label: 'Proizvodi', icon: Package },
-  { href: '/admin/categories', label: 'Kategorije', icon: FolderTree },
-  { href: '/admin/settings', label: 'Postavke', icon: Settings },
-];
-
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user } = await requireAdmin();
+  // The proxy only checks that a session cookie exists; this is the real admin check.
+  const user = await requireAdmin();
+
+  const nav = [
+    { href: '/admin', label: 'Pregled', icon: LayoutDashboard },
+    { href: '/admin/orders', label: 'Narudžbe', icon: ShoppingCart },
+    { href: '/admin/products', label: 'Proizvodi', icon: Package },
+    { href: '/admin/categories', label: 'Kategorije', icon: FolderTree },
+    ...(isModuleReady('blog') ? [{ href: '/admin/blog', label: 'Blog', icon: FileText }] : []),
+    { href: '/admin/settings', label: 'Postavke', icon: Settings },
+  ];
 
   return (
     <div className="min-h-screen bg-muted/40 md:grid md:grid-cols-[220px_1fr]">

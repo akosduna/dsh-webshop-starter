@@ -22,7 +22,11 @@ export function AuthCard({
   );
 }
 
-export function safeNextParam(value: string | string[] | undefined): string {
-  const next = typeof value === 'string' ? value : '';
-  return next.startsWith('/') && !next.startsWith('//') ? next : '/moj-racun';
+type Param = string | string[] | undefined;
+
+/** Same-site relative path from ?redirect= (or legacy ?next=); prevents open redirects. */
+export function safeRedirectParam(params: Record<string, Param>, fallback = '/moj-racun'): string {
+  const raw = params.redirect ?? params.next;
+  const value = typeof raw === 'string' ? raw : '';
+  return value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\') ? value : fallback;
 }

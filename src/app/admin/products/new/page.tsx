@@ -1,14 +1,16 @@
 import Link from 'next/link';
+import { asc } from 'drizzle-orm';
 import { ProductForm } from '@/components/admin/product-form';
-import { requireAdmin } from '@/lib/auth';
+import { getDb } from '@/db';
+import { categories } from '@/db/schema';
+import { requireAdmin } from '@/lib/auth/server';
 
 export default async function NewProductPage() {
-  const { supabase } = await requireAdmin();
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('id, name, parent_id')
-    .order('sort_order')
-    .order('name');
+  await requireAdmin();
+  const categoryOptions = await getDb()
+    .select({ id: categories.id, name: categories.name, parent_id: categories.parent_id })
+    .from(categories)
+    .orderBy(asc(categories.sort_order), asc(categories.name));
 
   return (
     <div className="space-y-6">
@@ -16,7 +18,7 @@ export default async function NewProductPage() {
         ← Proizvodi
       </Link>
       <h1 className="text-2xl font-semibold">Novi proizvod</h1>
-      <ProductForm categories={categories ?? []} />
+      <ProductForm categories={categoryOptions} />
       <p className="text-sm text-muted-foreground">Slike možete dodati nakon prvog spremanja.</p>
     </div>
   );

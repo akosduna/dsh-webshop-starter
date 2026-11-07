@@ -7,11 +7,16 @@ import type { CategoryWithChildren } from '@/lib/shop/catalog';
 export function Header({
   shopName,
   categories,
+  showBlog = false,
 }: {
   shopName: string;
   categories: CategoryWithChildren[];
+  showBlog?: boolean;
 }) {
-  const links = categories.map((c) => ({ href: `/kategorije/${c.slug}`, label: c.name }));
+  const links = [
+    ...categories.map((c) => ({ href: `/kategorije/${c.slug}`, label: c.name })),
+    ...(showBlog ? [{ href: '/blog', label: 'Blog' }] : []),
+  ];
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur">

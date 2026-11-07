@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 const fieldBase =
   'w-full rounded-md border bg-card px-3 text-sm shadow-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60';
 
-export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...props }: React.ComponentProps<'input'>) {
   return <input className={cn(fieldBase, 'h-10', className)} {...props} />;
 }
 

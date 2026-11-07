@@ -23,9 +23,11 @@ export default function TermsPage() {
 
       <h2>3. Narudžba i sklapanje ugovora</h2>
       <p>
-        Kupac odabire proizvode, unosi podatke za dostavu i račun te potvrđuje narudžbu plaćanjem.
-        Ugovor je sklopljen u trenutku uspješnog plaćanja. Nakon toga kupac na zaslonu dobiva broj
-        narudžbe <Fill>i potvrdu e-poštom, ako je slanje e-pošte uključeno</Fill>.
+        Kupac odabire proizvode, unosi podatke za dostavu i račun, odabire način plaćanja i potvrđuje
+        narudžbu. Kod plaćanja karticom ugovor je sklopljen u trenutku uspješnog plaćanja. Kod
+        plaćanja uplatom na račun ugovor je sklopljen potvrdom narudžbe, a proizvodi se šalju nakon
+        primitka uplate. Nakon narudžbe kupac na zaslonu dobiva broj narudžbe{' '}
+        <Fill>i potvrdu e-poštom, ako je slanje e-pošte uključeno</Fill>.
       </p>
 
       <h2>4. Cijene</h2>
@@ -37,9 +39,14 @@ export default function TermsPage() {
 
       <h2>5. Plaćanje</h2>
       <p>
-        Plaćanje se obavlja platnom karticom putem usluge Stripe. Podaci o kartici unose se izravno
-        kod Stripea i prodavatelj ih ne vidi niti pohranjuje. <Fill>Dodatni načini plaćanja, ako
-        postoje</Fill>.
+        Ponuđeni načini plaćanja prikazuju se pri naplati: <Fill>platnom karticom (Stripe i/ili
+        Teya) i/ili uplatom na račun (virman)</Fill>. Podaci o kartici unose se izravno kod pružatelja
+        plaćanja i prodavatelj ih ne vidi niti pohranjuje.
+      </p>
+      <p>
+        Kod plaćanja uplatom na račun kupac nakon narudžbe dobiva podatke za uplatu i barkod za
+        plaćanje mobilnim bankarstvom. Proizvodi se rezerviraju <Fill>7</Fill> dana; ako uplata ne
+        stigne u tom roku, prodavatelj može otkazati narudžbu.
       </p>
 
       <h2>6. Dostava</h2>

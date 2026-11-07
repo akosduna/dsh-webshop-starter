@@ -1,8 +1,12 @@
+import { and, eq } from 'drizzle-orm';
 import { NextResponse, type NextRequest } from 'next/server';
 import type Stripe from 'stripe';
+import { getDb } from '@/db';
+import { orders } from '@/db/schema';
 import { getStripe, stripeWebhookSecret } from '@/lib/stripe/server';
-import { createServiceClient } from '@/lib/supabase/service';
-import { confirmPaidOrder } from '@/lib/shop/payments';
+import { confirmStripePayment } from '@/lib/shop/payments';
+
+export const runtime = 'nodejs';
 
 /**
  * Stripe webhook. Subscribe to: payment_intent.succeeded,
@@ -32,7 +36,7 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
       case 'payment_intent.succeeded': {
-        const result = await confirmPaidOrder(event.data.object);
+        const result = await confirmStripePayment(event.data.object);
         if (result === 'paid') {
           console.info(`[stripe-webhook] order ${event.data.object.metadata?.order_id} paid`);
         }
@@ -41,11 +45,16 @@ export async function POST(request: NextRequest) {
       case 'payment_intent.payment_failed': {
         const orderId = event.data.object.metadata?.order_id;
         if (orderId) {
-          await createServiceClient()
-            .from('orders')
-            .update({ payment_status: 'failed' })
-            .eq('id', orderId)
-            .eq('payment_status', 'unpaid');
+          await getDb()
+            .update(orders)
+            .set({ payment_status: 'failed' })
+            .where(
+              and(
+                eq(orders.id, orderId),
+                eq(orders.stripe_payment_intent_id, event.data.object.id),
+                eq(orders.payment_status, 'unpaid'),
+              ),
+            );
         }
         break;
       }
@@ -54,10 +63,10 @@ export async function POST(request: NextRequest) {
         const intentId =
           typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
         if (intentId && charge.refunded) {
-          await createServiceClient()
-            .from('orders')
-            .update({ payment_status: 'refunded' })
-            .eq('stripe_payment_intent_id', intentId);
+          await getDb()
+            .update(orders)
+            .set({ payment_status: 'refunded' })
+            .where(eq(orders.stripe_payment_intent_id, intentId));
         }
         break;
       }
@@ -65,7 +74,7 @@ export async function POST(request: NextRequest) {
         break;
     }
   } catch (error) {
-    // 500 makes Stripe retry later; mark_order_paid is idempotent.
+    // 500 makes Stripe retry later; marking paid is idempotent.
     console.error('[stripe-webhook] handler error', error instanceof Error ? error.message : error);
     return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
   }

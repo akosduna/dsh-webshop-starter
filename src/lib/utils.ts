@@ -37,7 +37,7 @@ export function slugify(input: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-export function formatDate(iso: string): string {
+export function formatDate(iso: string | Date): string {
   return new Intl.DateTimeFormat('hr-HR', {
     day: '2-digit',
     month: '2-digit',

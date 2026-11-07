@@ -1,19 +1,29 @@
 import Link from 'next/link';
+import { asc, count, eq } from 'drizzle-orm';
 import { Plus } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { Badge, Card } from '@/components/ui/card';
 import { DeleteCategoryButton } from '@/components/admin/delete-buttons';
-import { requireAdmin } from '@/lib/auth';
+import { getDb } from '@/db';
+import { categories, products } from '@/db/schema';
+import { requireAdmin } from '@/lib/auth/server';
 
 export default async function AdminCategoriesPage() {
-  const { supabase } = await requireAdmin();
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('id, name, slug, parent_id, is_active, sort_order, products(count)')
-    .order('sort_order')
-    .order('name');
+  await requireAdmin();
+  const all = await getDb()
+    .select({
+      id: categories.id,
+      name: categories.name,
+      slug: categories.slug,
+      parent_id: categories.parent_id,
+      is_active: categories.is_active,
+      product_count: count(products.id),
+    })
+    .from(categories)
+    .leftJoin(products, eq(products.category_id, categories.id))
+    .groupBy(categories.id)
+    .orderBy(asc(categories.sort_order), asc(categories.name));
 
-  const all = categories ?? [];
   const tree = all
     .filter((c) => !c.parent_id)
     .flatMap((parent) => [
@@ -41,7 +51,7 @@ export default async function AdminCategoriesPage() {
                 {c.name}
               </Link>
               <span className="text-muted-foreground">/{c.slug}</span>
-              <span className="text-muted-foreground">{c.products[0]?.count ?? 0} proizvoda</span>
+              <span className="text-muted-foreground">{c.product_count} proizvoda</span>
               {!c.is_active && <Badge>Skrivena</Badge>}
               <span className="ml-auto">
                 <DeleteCategoryButton categoryId={c.id} />
