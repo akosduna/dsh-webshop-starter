@@ -1,0 +1,115 @@
+@import 'tailwindcss';
+
+/* =============================================================================
+   BRAND — change the look of the whole shop here.
+   Colours use OKLCH (https://oklch.com). Tailwind classes such as bg-primary,
+   text-muted-foreground or border-border read these variables.
+   ============================================================================= */
+:root {
+  /* Main brand colour (buttons, links, accents) and the text on top of it */
+  --primary: oklch(0.45 0.12 255);
+  --primary-foreground: oklch(0.99 0 0);
+
+  /* Page + text */
+  --background: oklch(0.99 0.002 255);
+  --foreground: oklch(0.2 0.01 255);
+
+  /* Surfaces */
+  --card: oklch(1 0 0);
+  --muted: oklch(0.96 0.005 255);
+  --muted-foreground: oklch(0.5 0.015 255);
+  --accent: oklch(0.94 0.02 255);
+  --accent-foreground: oklch(0.3 0.08 255);
+
+  /* Lines + states */
+  --border: oklch(0.91 0.006 255);
+  --ring: oklch(0.6 0.12 255);
+  --success: oklch(0.55 0.13 150);
+  --warning: oklch(0.7 0.14 75);
+  --destructive: oklch(0.56 0.2 25);
+
+  /* Shape */
+  --radius: 0.75rem;
+
+  /* Fonts — system fonts by default (no external requests).
+     To use a Google font, load it with next/font in src/app/layout.tsx and
+     put its CSS variable first here, e.g. var(--font-inter), ui-sans-serif… */
+  --font-body: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: var(--font-body);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-heading);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.01em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Long-form text on legal pages */
+.prose-legal h2 {
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.prose-legal p,
+.prose-legal li {
+  line-height: 1.7;
+  color: var(--foreground);
+}
+.prose-legal p + p {
+  margin-top: 0.75rem;
+}
+.prose-legal ul {
+  margin: 0.5rem 0 0.5rem 1.25rem;
+  list-style: disc;
+}
+.prose-legal mark {
+  background: oklch(0.95 0.08 95);
+  padding: 0 0.2em;
+  border-radius: 0.2em;
+}
