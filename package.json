@@ -1,0 +1,40 @@
+{
+  "name": "dsh-webshop-starter",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@stripe/react-stripe-js": "^5.6.0",
+    "@stripe/stripe-js": "^8.7.0",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.95.3",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.563.0",
+    "next": "16.4.5",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "server-only": "^0.0.1",
+    "stripe": "^19.3.1",
+    "tailwind-merge": "^3.4.0",
+    "zustand": "^5.0.11"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^22",
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "16.4.5",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5"
+  }
+}
