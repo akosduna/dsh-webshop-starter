@@ -1,31 +1,15 @@
 import type { NextConfig } from 'next';
 
-function supabaseHostname(): string | null {
-  try {
-    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname;
-  } catch {
-    return null;
-  }
-}
-
-const hostname = supabaseHostname();
-
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: '**.supabase.co', pathname: '/storage/v1/object/public/**' },
-      ...(hostname && !hostname.endsWith('.supabase.co')
-        ? [{ protocol: 'https' as const, hostname, pathname: '/storage/v1/object/public/**' }]
-        : []),
+      // Product images, category images and blog covers uploaded to Vercel Blob.
+      { protocol: 'https', hostname: '*.public.blob.vercel-storage.com' },
     ],
     formats: ['image/webp'],
   },
-  experimental: {
-    serverActions: {
-      // Admin image uploads go through a server action.
-      bodySizeLimit: '6mb',
-    },
-  },
+  // pg uses Node built-ins; keep it out of the server bundle.
+  serverExternalPackages: ['pg'],
 };
 
 export default nextConfig;

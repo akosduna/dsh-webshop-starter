@@ -1,43 +1,29 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 /**
- * Refreshes the Supabase session cookie so Server Components see a valid
- * user. Skipped for visitors without a Supabase auth cookie, so anonymous
- * shoppers don't pay for an extra auth round-trip on every page.
+ * Cheap gate for /admin and /moj-racun: only checks that a Better Auth
+ * session cookie exists and sends visitors without one to the login page.
+ * The real check (valid session, admin role) runs on the server in
+ * src/app/admin/layout.tsx, every admin action / route, and requireUser() —
+ * the proxy never talks to the database.
  */
-export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+const AUTH_COOKIE_NAMES = ['better-auth.session_token', '__Secure-better-auth.session_token'];
 
-  const hasAuthCookie = request.cookies.getAll().some((c) => c.name.startsWith('sb-'));
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!hasAuthCookie || !url || !key) return response;
+export function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  const hasSession = AUTH_COOKIE_NAMES.some((name) => request.cookies.get(name)?.value);
 
-  const supabase = createServerClient(url, key, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options),
-        );
-      },
-    },
-  });
-
-  try {
-    await supabase.auth.getUser();
-  } catch {
-    // Aborted request or network hiccup: refreshing is best-effort.
+  if (!hasSession) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/prijava';
+    url.search = '';
+    url.searchParams.set('redirect', pathname + search);
+    return NextResponse.redirect(url);
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|demo/|favicon.ico|robots.txt|sitemap.xml|.*\\..*).*)'],
+  matcher: ['/admin/:path*', '/moj-racun/:path*'],
 };
