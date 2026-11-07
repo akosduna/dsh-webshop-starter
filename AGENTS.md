@@ -10,35 +10,35 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # AGENTS.md
 
-Webshop starter: Next.js 16 App Router + Supabase + Stripe. Setup for a new shop owner is in
-**[AGENT-SETUP.md](./AGENT-SETUP.md)** — follow it step by step, including its rules (ask the human before
-anything that costs money or goes live; never print or commit secrets).
+Webshop starter: Next.js 16 App Router + Neon Postgres (Drizzle) + Better Auth + Vercel Blob. Setup for a new shop
+owner is in **[AGENT-SETUP.md](./AGENT-SETUP.md)** — follow it step by step, including its rules (ask the human
+before anything that costs money or goes live; never print or commit secrets). Database: **DATABASE-SETUP.md**.
+Payments, carriers, e-mail: **INTEGRATIONS.md**.
 
 ## Conventions
 
 - **Language:** customer-facing text in Croatian; code, comments and identifiers in English. Public URLs are
-  Croatian (`/proizvodi`, `/kosarica`, `/naplata`), admin URLs English (`/admin/products`).
-- **Money:** integer cents everywhere (`price_cents`, `total_cents`), currency EUR. Format with `formatPrice()`,
-  parse admin input with `parsePriceToCents()` (`src/lib/utils.ts`).
-- **Data:** read in Server Components through `src/lib/shop/catalog.ts` (cookie-less public client, cacheable).
-  Writes are Server Actions (`actions.ts` next to the route). Use `src/lib/supabase/server.ts` for the logged-in
-  user and in admin actions (RLS still applies), `service.ts` (secret key, bypasses RLS) only on the server for
-  creating orders and confirming payments.
+  Croatian (`/proizvodi`, `/naplata`), admin URLs English (`/admin/products`).
+- **Money:** integer cents everywhere, currency EUR. `formatPrice()` / `parsePriceToCents()` in `src/lib/utils.ts`.
+- **Modules:** every integration is a module in `src/config/modules.ts`; gate code with `isModuleReady(id)`
+  (`src/lib/modules.ts`). Merchant identifiers come from env or store settings, never from code.
+- **Data:** Drizzle via `getDb()` (`src/db`). Schema in `src/db/schema.ts`; client components import enums/types
+  from `@/db/enums` only. Reads in Server Components; writes are Server Actions next to the route.
+- **Access checks live in code:** `requireUser()` / `requireAdmin()` in layouts and pages, `assertAdmin()` in every
+  admin action and route (`src/lib/auth/server.ts`). `src/proxy.ts` only checks that a session cookie exists.
+- **Auth contract (Better Auth):** own `pg` Pool in `src/lib/auth/auth.ts`, no Drizzle adapter, `auth` stays a
+  direct export, keep the retry layers and trusted origins. Do not refactor these one by one.
 - **Prices and stock are never trusted from the browser.** Checkout recomputes everything from the database.
-- **Payments:** order paid + stock decrement happen only in `confirmPaidOrder()` → SQL `mark_order_paid()`
-  (idempotent). Don't decrement stock anywhere else.
-- **Auth:** `requireUser()` / `requireAdmin()` from `src/lib/auth.ts` in layouts, pages and every admin action.
-  Admin = `profiles.role = 'admin'`, checked in SQL by `public.is_admin()`.
-- **Database changes:** new additive migration in `supabase/migrations/`. Every new public table needs
-  `enable row level security`, explicit `grant`s and policies in the same file (Supabase no longer auto-grants
-  new tables). Update `src/types/database.ts` to match.
-- **Styling:** Tailwind with tokens from the BRAND block in `src/app/globals.css` (`bg-primary`,
-  `text-muted-foreground`, …). No hard-coded brand colours in components.
-- **UI feedback:** inline messages (`FormMessage`) and two-step confirm buttons — no `alert()` / `confirm()`.
-- **No shortcuts:** no `// @ts-ignore`, no `ignoreBuildErrors`, no disabling RLS.
+- **Payments and stock:** only through `src/lib/shop/order-lifecycle.ts` (`markOrderPaid`, `cancelOrder`,
+  `reserveStock`) — row lock + idempotent. Don't change stock anywhere else.
+- **Side effects** (shipments, e-mails) go through `src/lib/live-guard.ts`: production only unless allowed.
+- **Database changes:** edit `schema.ts`, `npm run db:generate`, commit the new file in `drizzle/`. Additive only.
+- **Styling:** Tailwind with tokens from the BRAND block in `src/app/globals.css`. No hard-coded brand colours.
+- **UI feedback:** inline messages and two-step confirm buttons, no `alert()` / `confirm()` / `prompt()`.
+- **No shortcuts:** no `// @ts-ignore`, no `ignoreBuildErrors`, no skipped auth checks.
 
 ## Checks before you finish
 
 ```bash
-npm run typecheck && npm run lint && npm run build
+npm run typecheck && npm run lint && npm test && npm run build
 ```

@@ -1,74 +1,109 @@
 # Webshop starter
 
-Gotova, jednostavna internetska trgovina koju preuzmeš, povežeš sa svojim Supabase, Stripe i Vercel računom i
-prilagodiš svom brendu. Namijenjena je polaznicima AI tečajeva i kao polazna točka za projekte trgovina.
+Gotova internetska trgovina koju preuzmeš, povežeš sa svojim Vercel računom (baza Neon, slike Vercel Blob) i
+prilagodiš svom brendu. Plaćanje virmanom s barkodom, karticom (Stripe ili Teya), dostava GLS i BOX NOW, blog i
+korisnički računi. Namijenjena polaznicima AI tečajeva i kao polazna točka za projekte trgovina.
 
-Ako radiš s AI agentom (Cursor, Claude Code, Codex…), daj mu datoteku **[AGENT-SETUP.md](./AGENT-SETUP.md)** — u njoj
-su svi koraci postavljanja, korak po korak, s provjerama.
+Ako radiš s AI agentom (Cursor, Claude Code, Codex…), daj mu datoteku **[AGENT-SETUP.md](./AGENT-SETUP.md)**: u njoj
+su svi koraci postavljanja s provjerama.
 
 ## Što trgovina ima
 
-- **Početna** — naslov iz postavki, izdvojeni proizvodi i kategorije
-- **Kategorije** s najviše jednom razinom potkategorija
-- **Popis proizvoda** — pretraga, filtar po cijeni i kategoriji, sortiranje, stranice
-- **Stranica proizvoda** — galerija, varijante (npr. veličina i boja), stanje zalihe
-- **Košarica** — radi i bez prijave, pamti se u pregledniku
-- **Naplata** kao gost ili prijavljeni kupac, adresa dostave i računa, odabir načina dostave
-- **Plaćanje karticom** preko Stripea (Payment Element) i webhook koji narudžbu označi plaćenom i smanji zalihu
-  (sigurno i kad Stripe pošalje isti događaj više puta)
-- **Korisnički račun** — prijava, registracija, zaboravljena lozinka, povijest narudžbi, spremljene adrese
-- **Dostava** — dostava na adresu (s pragom za besplatnu dostavu) i osobno preuzimanje
-- **Administracija** (`/admin`) — pregled, proizvodi s fotografijama i varijantama, kategorije, narudžbe sa
-  statusima, postavke trgovine i dostave
-- **Pravne stranice** — predlošci na hrvatskom s oznakama `[UPIŠI …]`: Uvjeti kupnje, Privatnost, Kolačići,
-  Jednostrani raskid ugovora
+- **Početna**: naslov iz postavki, izdvojeni proizvodi i kategorije
+- **Kategorije** s jednom razinom potkategorija, **popis proizvoda** s pretragom, filtrima, sortiranjem i stranicama
+- **Stranica proizvoda**: galerija, varijante (npr. veličina i boja), stanje zalihe
+- **Košarica** radi i bez prijave i pamti se u pregledniku
+- **Naplata** kao gost ili prijavljeni kupac (spremljene adrese se nude same)
+- **Načini plaćanja**
+  - **uplata na račun (virman)**: podaci za uplatu i PDF417 barkod za „slikaj i plati”, zaliha se rezervira odmah
+  - **kartica preko Stripea** (Payment Element, Apple Pay, Google Pay)
+  - **kartica preko Teye** (SecurePay stranica, isključeno dok se ne uključi)
+- **Dostava**: dostava na adresu po fiksnoj cijeni, osobno preuzimanje, GLS na adresu, GLS paketomat / ParcelShop
+  (karta za odabir), BOX NOW paketomat (karta za odabir). Cijene, prag za besplatnu dostavu, najveći iznos narudžbe
+  i države uređuju se u administraciji.
+- **Korisnički račun**: registracija, prijava, zaboravljena lozinka, profil, promjena lozinke, adrese, povijest
+  narudžbi s praćenjem pošiljke i podacima za uplatu
+- **Blog** (`/blog`): objave s naslovnom slikom, SEO naslovom i opisom, u sitemapi
+- **Administracija** (`/admin`)
+  - pregled sa stanjem modula
+  - proizvodi s fotografijama i varijantama, kategorije
+  - narudžbe: označi plaćeno, otkaži, skupno otkaži neplaćene virmane, izradi GLS / BOX NOW pošiljku, ispiši
+    naljepnicu, osvježi praćenje
+  - blog s uređivačem teksta, postavke trgovine i dostave
+- **E-mailovi o narudžbi** (isključeno dok se ne uključi): zaprimljeno, upute za uplatu, plaćeno, poslano
+- **Pravne stranice**: predlošci na hrvatskom s oznakama `[UPIŠI …]` (Uvjeti kupnje, Privatnost, Kolačići,
+  Jednostrani raskid ugovora)
 
 Svi tekstovi za kupce su na hrvatskom, cijene u eurima.
 
+## Moduli
+
+Svaki dio koji treba vanjski račun je **modul** u `src/config/modules.ts`. Modul radi kad je uključen (`enabled`) i
+kad su postavljeni svi njegovi ključevi. Do tada se u trgovini ne prikazuje (naplata nudi samo spremne načine
+plaćanja i dostave), a **Admin → Pregled** pokazuje stanje: ✅ spreman · ⚠ nedostaju ključevi: … · ⏸ isključeno.
+
+| Modul | Zadano | Ključevi |
+| --- | --- | --- |
+| Uplata na račun (virman) | uključeno | `BANK_IBAN`, `BANK_RECIPIENT_NAME`, `BANK_RECIPIENT_STREET`, `BANK_RECIPIENT_CITY` |
+| Stripe | uključeno | `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` |
+| Teya | isključeno | `TEYA_MERCHANT_ID`, `TEYA_PAYMENT_GATEWAY_ID`, `TEYA_SECRET_KEY`, `TEYA_API_URL` |
+| GLS | uključeno | `GLS_USERNAME`, `GLS_PASSWORD`, `GLS_CLIENT_NUMBER`, `GLS_SENDER_*` |
+| BOX NOW | uključeno | `BOXNOW_CLIENT_ID`, `BOXNOW_CLIENT_SECRET`, `BOXNOW_PARTNER_ID`, `BOXNOW_WAREHOUSE_ID`, `BOXNOW_WEBHOOK_SECRET` |
+| Dostava na adresu (fiksna cijena) | uključeno | — |
+| Osobno preuzimanje | uključeno | — |
+| Blog | uključeno | — |
+| E-mailovi o narudžbi (Resend) | isključeno | `RESEND_API_KEY`, `EMAIL_FROM` |
+| Upload slika (Vercel Blob) | uključeno | `BLOB_READ_WRITE_TOKEN` |
+
+Kako dobiti ključeve za svaki modul: **[INTEGRATIONS.md](./INTEGRATIONS.md)**.
+
 ## Tehnologija
 
-Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Supabase (baza, prijava, spremište slika) ·
-Stripe · zustand (košarica) · Vercel (hosting)
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Neon Postgres + Drizzle ORM · Better Auth
+(e-mail i lozinka) · Vercel Blob · Stripe · zustand (košarica) · tiptap (uređivač bloga) · Vercel (hosting)
 
 ## Brzi početak
 
-Potrebno: Node.js 20.9+, Git, besplatni računi na [Supabase](https://supabase.com), [Stripe](https://stripe.com) i
-[Vercel](https://vercel.com). Detalji za svaki korak su u [AGENT-SETUP.md](./AGENT-SETUP.md).
+Potrebno: Node.js 20.9+, Git, besplatni [Vercel](https://vercel.com) račun i Vercel CLI (`npm i -g vercel`).
+Detalji su u [AGENT-SETUP.md](./AGENT-SETUP.md) i [DATABASE-SETUP.md](./DATABASE-SETUP.md).
 
-1. Preuzmi projekt i instaliraj pakete: `npm install`
-2. Napravi novi Supabase projekt.
-3. Primijeni bazu: `npx supabase link --project-ref <ref>` pa `npx supabase db push --include-seed`
-   (ili zalijepi SQL datoteke u Supabase SQL Editor).
-4. Kopiraj `.env.example` u `.env.local` i upiši Supabase i Stripe **test** ključeve.
-5. Pokreni: `npm run dev` i otvori http://localhost:3000
-6. Registriraj se u trgovini, pa sebe postavi za administratora (SQL u AGENT-SETUP.md, korak 5).
-7. Za plaćanje lokalno pokreni `stripe listen --forward-to localhost:3000/api/stripe/webhook` i
-   `whsec_…` vrijednost upiši u `.env.local`.
-8. Probna kupnja s karticom `4242 4242 4242 4242` → narudžba je u `/admin/orders` označena kao plaćena.
-9. Objavi na Vercelu, dodaj varijable okruženja i Stripe webhook za produkcijski URL.
-10. Prije prave prodaje: ispuni pravne stranice, svoje proizvode i prebaci Stripe na live ključeve.
+1. `npm install`
+2. `vercel link`, pa u Vercelu dodaj **Neon** bazu (Storage → Marketplace) i **Blob** spremište.
+3. `vercel env pull .env.local`, pa u `.env.local` dodaj `BETTER_AUTH_SECRET`, `ADMIN_EMAILS`,
+   `NEXT_PUBLIC_APP_URL=http://localhost:3000` i podatke za uplatu (`BANK_*`).
+4. `npm run db:migrate` pa `npm run db:seed`
+5. `npm run dev` i otvori http://localhost:3000
+6. Registriraj se e-mailom iz `ADMIN_EMAILS` → `/admin` je tvoj.
+7. Probna narudžba „Uplata na račun” → stranica s barkodom → u administraciji „Označi plaćeno”.
+8. Po potrebi postavi Stripe, GLS, BOX NOW, Teyu i e-mail ([INTEGRATIONS.md](./INTEGRATIONS.md)).
+9. Prije prave prodaje: ispuni pravne stranice, unesi svoje proizvode, prebaci plaćanja na live ključeve.
 
 ## Struktura projekta
 
 ```
 src/
   app/
-    (shop)/          trgovina: početna, proizvodi, kategorije, košarica, naplata, račun, pravne stranice
-    (shop)/(auth)/   prijava, registracija, zaboravljena i nova lozinka
-    admin/           administracija (samo za ulogu admin)
-    api/stripe/      Stripe webhook
-    auth/callback/   povratak iz e-mail poveznica (potvrda računa, nova lozinka)
-    globals.css      BREND: boje, fontovi, zaobljenost
-  components/        UI komponente (ui/ su osnovni gumbi, polja, kartice)
-  config/site.ts     ostale postavke (broj proizvoda po stranici, napomena o pravnim tekstovima)
-  lib/               Supabase klijenti, Stripe, katalog, narudžbe, pomoćne funkcije
-  store/cart.ts      košarica
-  types/database.ts  tipovi tablica
-  proxy.ts           osvježavanje prijave
-supabase/
-  migrations/        shema baze, funkcije, prava pristupa (RLS), spremište slika
-  seed.sql           demo podaci (3 kategorije, 8 proizvoda, 2 načina dostave)
-public/demo/         demo slike proizvoda
+    (shop)/            trgovina: početna, proizvodi, kategorije, košarica, naplata, račun, blog, pravne stranice
+    (shop)/(auth)/     prijava, registracija, zaboravljena i nova lozinka
+    admin/             administracija (samo administratori)
+    api/auth/          Better Auth
+    api/stripe/        Stripe webhook
+    api/teya/          Teya povratne adrese (notify, success, cancel, error)
+    api/boxnow/        BOX NOW webhook
+    api/orders/        barkod za uplatu (PNG)
+    api/admin/         upload slika (Blob), GLS / BOX NOW naljepnice
+    api/health/        provjera nakon objave (env, baza, tablice, moduli)
+    globals.css        BREND: boje, fontovi, zaobljenost
+  components/          UI komponente (ui/ su osnovni gumbi, polja, kartice)
+  config/modules.ts    MODULI: uključivanje i isključivanje
+  config/site.ts       ostale postavke (broj proizvoda po stranici, napomena o pravnim tekstovima)
+  db/schema.ts         shema baze (Drizzle); auth-schema.ts su tablice prijave
+  lib/                 prijava, plaćanja (HUB-3, Stripe, Teya), dostava (GLS, BOX NOW), e-mail, katalog, narudžbe
+  store/cart.ts        košarica
+  proxy.ts             brza provjera kolačića za /admin i /moj-racun
+drizzle/               SQL migracije (generira drizzle-kit, commitaju se)
+scripts/seed.ts        početni podaci (postavke, 5 načina dostave, demo katalog i blog objava)
+public/demo/           demo slike
 ```
 
 ## Kako promijeniti izgled (brend)
@@ -86,14 +121,19 @@ zamijeni tekstualni naziv u `src/components/layout/header.tsx` svojom slikom i z
 
 ## Naredbe
 
-| Naredba             | Što radi                              |
-| ------------------- | ------------------------------------- |
-| `npm run dev`       | lokalni razvoj na http://localhost:3000 |
-| `npm run build`     | produkcijska verzija                  |
-| `npm run lint`      | provjera koda                         |
-| `npm run typecheck` | provjera TypeScript tipova            |
+| Naredba | Što radi |
+| --- | --- |
+| `npm run dev` | lokalni razvoj na http://localhost:3000 |
+| `npm run build` | produkcijska verzija |
+| `npm run lint` | provjera koda |
+| `npm run typecheck` | provjera TypeScript tipova |
+| `npm test` | unit testovi (`node:test` preko `tsx`) |
+| `npm run db:generate` | nova migracija iz promjena u `src/db/schema.ts` |
+| `npm run db:migrate` | primijeni migracije na bazu iz `.env.local` |
+| `npm run db:seed` | početni podaci (`-- --no-demo` bez demo kataloga) |
+| `npm run db:studio` | pregled baze u pregledniku (Drizzle Studio) |
 
 ## Važno
 
 Pravni tekstovi su **predlošci**. Vlasnik trgovine ih mora provjeriti i prilagoditi (po potrebi uz pravnika) prije
-početka prodaje. Isto vrijedi za podatke o tvrtki, PDV-u i fiskalizaciji, koji ovise o tvojoj vrsti poslovanja.
+početka prodaje. Isto vrijedi za podatke o tvrtki, PDV-u i fiskalizaciji, koji ovise o vrsti poslovanja.
